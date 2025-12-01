@@ -1,0 +1,110 @@
+import pandas as pd
+
+import re
+
+
+
+# Function to decode the Cloudflare email (XOR Decoding)
+
+def cf_decode_email(encoded_string):
+
+    # Check if the string is a valid hex string (length must be even and all characters should be hex)
+
+    if not all(c in '0123456789abcdefABCDEF' for c in encoded_string):
+
+        return "No email Found"  # Replace "Invalid Hex String" with "No email Found"
+
+
+
+    decoded_email = ""
+
+    try:
+
+        r = int(encoded_string[:2], 16)  # Extract the first two characters and convert from hex
+
+        for n in range(2, len(encoded_string), 2):
+
+            i = int(encoded_string[n:n+2], 16) ^ r  # XOR each pair of characters
+
+            decoded_email += chr(i)  # Convert the result to a character and append
+
+    except ValueError:
+
+        decoded_email = "Decoding Error"  # In case of decoding errors, return an error message
+
+    return decoded_email
+
+
+
+# Function to sanitize decoded email to remove illegal characters for Excel
+
+def sanitize_email(decoded_email):
+
+    # Remove characters that are illegal in Excel
+
+    # Illegal characters in Excel: \x00, \x01, \x02, ..., \x1F (control characters)
+
+    # and also some other characters like: 0x7F (DEL), etc.
+
+    return ''.join(c for c in decoded_email if c.isprintable() and c not in '\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\x7F')
+
+
+
+# Function to process the Excel file
+
+def process_excel(input_file, output_file):
+
+    # Read the input Excel file into a DataFrame
+
+    df = pd.read_excel(input_file)
+
+
+
+    # Check if 'encoded_email' column exists
+
+    if 'encoded_email' not in df.columns:
+
+        print("Error: 'encoded_email' column not found in the input file.")
+
+        return
+
+   
+
+    # Apply the decoding function to the 'encoded_email' column and create a new 'decoded_email' column
+
+    df['decoded_email'] = df['encoded_email'].apply(lambda x: cf_decode_email(str(x)) if pd.notnull(x) else '')
+
+
+
+    # Handle "Decoding Error" or other decoding issues
+
+    df['decoded_email'] = df['decoded_email'].apply(lambda x: 'No email Found' if x == 'No email Found' else x)
+
+
+
+    # Sanitize the decoded email to remove illegal characters for Excel
+
+    df['decoded_email'] = df['decoded_email'].apply(sanitize_email)
+
+
+
+    # Save the processed DataFrame to a new Excel file
+
+    df.to_excel(output_file, index=False)
+
+    print(f"Processed Excel file saved as '{output_file}'.")
+
+
+
+# Example usage with your updated file path
+
+input_file = r"C:\Users\prashant.s3\Desktop\email decoder\send_to_prashant.xlsx"  # Input file path
+
+output_file = r"C:\Users\prashant.s3\Desktop\email decoder\output_decoded_emails.xlsx"  # Output file path
+
+
+
+# Run the process
+
+process_excel(input_file, output_file)
+
